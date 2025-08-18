@@ -7,8 +7,7 @@
 <h1 align="center">Sistema de Agendamento de Aulas</h1>
 
 
-O **Sistema de Agendamento de Aulas** é um projeto acadêmico desenvolvido para a disciplina **Redes de Computadores - DCC042** da UFJF.  
-Ele simula uma plataforma de agendamento de aulas entre **alunos** e **tutores**, aplicando conceitos de:
+O **Sistema de Agendamento de Aulas** é um projeto acadêmico desenvolvido para a disciplina **Redes de Computadores - DCC042** da UFJF.  Ele simula uma plataforma de agendamento de aulas entre **alunos** e **tutores**, aplicando conceitos de:
 
 - Comunicação via **sockets TCP**
 - Autenticação com **JWT**
@@ -65,7 +64,7 @@ pip install bcrypt pyjwt cryptography pycryptodome
 python server.py
 ```
 
-3. **(Terminal 2): Inicie o cliente**
+2. **(Terminal 2): Inicie o cliente**
 ```bash
 python client.py
 ```
