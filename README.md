@@ -1,38 +1,56 @@
-# Sistema de Agendamento de Aulas Particulares (Tutor x Aluno)
+<p align="center">
+  <a href="https://www.ufjf.br" rel="noopener" target="_blank">
+    <img width="261" height="148" src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/Logo_da_UFJF.png/640px-Logo_da_UFJF.png" alt="Logo UFJF" />
+  </a>
+</p>
 
-Este projeto é uma aplicação cliente-servidor desenvolvida em Python, que simula o funcionamento de uma plataforma 
-de agendamento de aulas entre **alunos** e **tutores**. A comunicação ocorre por **sockets TCP**, com autenticação via **JWT**, 
-criptografia híbrida (**RSA + Fernet**) e segurança de senha com **bcrypt**.
+<h1 align="center">Sistema de Agendamento de Aulas</h1>
+
+
+O **Sistema de Agendamento de Aulas** é um projeto acadêmico desenvolvido para a disciplina **Redes de Computadores - DCC042** da UFJF.  
+Ele simula uma plataforma de agendamento de aulas entre **alunos** e **tutores**, aplicando conceitos de:
+
+- Comunicação via **sockets TCP**
+- Autenticação com **JWT**
+- Criptografia híbrida **(RSA + Fernet)**
+- Segurança de senha com **bcrypt**
+
+
+
+## 🏗️ Arquitetura
+
+O sistema é organizado em **cliente** e **servidor**, comunicando-se via TCP sockets:
+
+- **Servidor:** gerencia usuários, agenda de tutores, autenticação e criptografia  
+- **Cliente:** interface de interação do aluno ou tutor, realiza requisições e exibe dados  
+- **Banco de Dados:** SQLite local, armazena usuários, agendas e sessões  
+
+
 
 ## ⚙️ Funcionalidades
 
-### Aluno
-- Cadastro com dados pessoais e senha criptografada
-- Login seguro com geração de token JWT
-- Visualização da lista de tutores disponíveis
-- Agendamento de aulas com tutores
-- Consulta, edição ou cancelamento de aulas agendadas
+### 👩‍🎓 Aluno
+- Cadastro com dados pessoais e senha criptografada  
+- Login seguro com JWT  
+- Visualização de tutores disponíveis  
+- Agendamento, consulta, edição ou cancelamento de aulas  
 
-### Tutor
-- Cadastro com especialidade, disciplina e horários disponíveis
-- Login seguro com token JWT
-- Gerenciamento da própria agenda
+### 👨‍🏫 Tutor
+- Cadastro com especialidade, disciplina e horários disponíveis  
+- Login seguro com JWT  
+- Gerenciamento da própria agenda  
 
-### Plataforma (Admin - opcional)
-- Cadastro institucional para vincular tutores
-- Visão geral da operação (expansível)
+### 🛡️ Admin (opcional)
+- Cadastro institucional e vinculação de tutores  
+- Visão geral da operação  
 
----
 
-## 🛠 Tecnologias Utilizadas
-- Python 3
-- socket (comunicação cliente-servidor)
-- bcrypt (hash de senha)
-- jwt (tokens de autenticação)
-- cryptography / pycryptodome (criptografia híbrida RSA + Fernet)
-- SQLite (banco de dados local)
+## 🔐 Camada de Segurança
 
----
+- Senhas armazenadas com **bcrypt**  
+- Mensagens entre cliente e servidor criptografadas com **Fernet + RSA**  
+- Autenticação via **tokens JWT** com tempo de expiração  
+
 
 ## 🚀 Como Executar
 
@@ -61,11 +79,7 @@ fuser -k 4444/tcp
 ```bash
 python test_sistema_completo.py
 ```
----
 
-## 🔐 Segurança
-- As senhas são armazenadas com hash `bcrypt`
-- As mensagens trocadas entre cliente e servidor são criptografadas com chave simétrica Fernet (entregue com RSA)
-- Os acessos são protegidos por tokens JWT com tempo de expiração
 
----
+
+
