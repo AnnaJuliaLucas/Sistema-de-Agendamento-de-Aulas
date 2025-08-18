@@ -804,7 +804,7 @@ class SecureServerComplete:
             return {'success': False, 'error': 'Erro interno do servidor'}
     
     def _handle_update_appointment(self, message, address):
-        """Atualiza um agendamento"""
+        """Atualiza (reagenda) um agendamento"""
         user = self._verify_token(message.get('token'))
         if not user:
             return {'success': False, 'error': 'Token inválido'}
@@ -812,60 +812,70 @@ class SecureServerComplete:
         try:
             appointment_id = message.get('appointment_id')
             new_date = message.get('new_date')
-            
+
             if not all([appointment_id, new_date]):
                 return {'success': False, 'error': 'Dados incompletos'}
-            
+
             conn = sqlite3.connect('secure_sistema.db')
             cursor = conn.cursor()
-            
-            # Verifica se o usuário pode editar este agendamento
+
+            # Busca dono/permissões + status atual
             cursor.execute('''
-                SELECT student_id, tutor_id, platform_id FROM appointments WHERE id = ?
+                SELECT student_id, tutor_id, platform_id, status
+                FROM appointments
+                WHERE id = ?
             ''', (appointment_id,))
-            
-            appointment_data = cursor.fetchone()
-            if not appointment_data:
+            row = cursor.fetchone()
+
+            if not row:
                 conn.close()
                 return {'success': False, 'error': 'Agendamento não encontrado'}
-            
-            student_id, tutor_id, platform_id = appointment_data
-            
-            # Verifica permissão
+
+            student_id, tutor_id, platform_id, status = row
+
+            # Permissão
             if not (user['id'] == student_id or user['id'] == tutor_id or user['id'] == platform_id):
                 conn.close()
                 return {'success': False, 'error': 'Sem permissão para editar este agendamento'}
-            
-            # Verifica se o novo horário está disponível
+
+            # Bloqueia reagendamento se não estiver scheduled
+            if status != 'scheduled':
+                conn.close()
+                return {'success': False, 'error': 'Não é possível reagendar uma aula cancelada (ou com status diferente de "scheduled")'}
+
+            # Conflito de horário no novo slot
             cursor.execute('''
-                SELECT id FROM appointments 
-                WHERE tutor_id = ? AND appointment_date = ? AND status != 'cancelled' AND id != ?
+                SELECT id FROM appointments
+                WHERE tutor_id = ? AND appointment_date = ?
+                AND status != 'cancelled' AND id != ?
             ''', (tutor_id, new_date, appointment_id))
-            
             if cursor.fetchone():
                 conn.close()
                 return {'success': False, 'error': 'Novo horário não disponível'}
-            
-            # Atualiza o agendamento
+
+            # Atualização ATÔMICA: só atualiza se continuar 'scheduled'
             cursor.execute('''
-                UPDATE appointments 
+                UPDATE appointments
                 SET appointment_date = ?
-                WHERE id = ?
+                WHERE id = ? AND status = 'scheduled'
             ''', (new_date, appointment_id))
-            
-            # Log de segurança
+
+            # Se ninguém foi atualizado, alguém mudou o status no meio do caminho
+            if cursor.rowcount == 0:
+                conn.close()
+                return {'success': False, 'error': 'Agendamento não está apto para reagendamento'}
+
             self._log_security_event(cursor, user['id'], 'update_appointment', address[0], True, f'Aula reagendada ID: {appointment_id}')
-            
             conn.commit()
             conn.close()
-            
+
             print(f"✅ Aula reagendada: ID {appointment_id}")
             return {'success': True, 'message': 'Aula reagendada com sucesso'}
-            
+
         except Exception as e:
             print(f"❌ Erro ao reagendar aula: {e}")
             return {'success': False, 'error': 'Erro interno do servidor'}
-    
+        
     def _handle_cancel_appointment(self, message, address):
         """Cancela um agendamento"""
         user = self._verify_token(message.get('token'))
@@ -883,16 +893,24 @@ class SecureServerComplete:
             
             # Verifica se o usuário pode cancelar este agendamento
             cursor.execute('''
-                SELECT student_id, tutor_id, platform_id FROM appointments WHERE id = ?
+                SELECT student_id, tutor_id, platform_id, status 
+                FROM appointments 
+                WHERE id = ?
             ''', (appointment_id,))
             
             appointment_data = cursor.fetchone()
+            
             if not appointment_data:
                 conn.close()
                 return {'success': False, 'error': 'Agendamento não encontrado'}
             
-            student_id, tutor_id, platform_id = appointment_data
+            student_id, tutor_id, platform_id, status = appointment_data
             
+            # Se já estiver cancelado, não pode reagendar
+            if status == 'cancelled':
+                conn.close()
+                return {'success': False, 'error': 'Não é possível reagendar uma aula cancelada'}
+
             # Verifica permissão
             if not (user['id'] == student_id or user['id'] == tutor_id or user['id'] == platform_id):
                 conn.close()
@@ -1083,9 +1101,10 @@ class SecureServerComplete:
             cursor.execute('SELECT password_hash FROM users WHERE id = ?', (user['id'],))
             stored_hash = cursor.fetchone()[0]
             
-            if self.security.verify_password_server_side(password_hash.encode("utf-8"), stored_hash):
+            if not self.security.verify_password_server_side(password_hash, stored_hash):
                 conn.close()
                 return {'success': False, 'error': 'Senha incorreta'}
+
             
             # Cancela todos os agendamentos
             cursor.execute('''

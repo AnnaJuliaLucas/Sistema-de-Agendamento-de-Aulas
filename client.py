@@ -9,6 +9,7 @@ import getpass
 import base64
 from datetime import datetime
 from security_utils import SecurityManager
+from getpass import getpass
 
 class SecureClientComplete:
     """Cliente com implementação completa e segura"""
@@ -127,8 +128,8 @@ class SecureClientComplete:
         phone = input("Telefone: ").strip()
         
         # Solicita senha de forma segura
-        password = getpass.getpass("Senha: ")
-        password_confirm = getpass.getpass("Confirme a senha: ")
+        password = getpass("Senha: ")
+        password_confirm = getpass("Confirme a senha: ")
         
         if password != password_confirm:
             print("❌ Senhas não coincidem!")
@@ -199,7 +200,7 @@ class SecureClientComplete:
         print("\n=== LOGIN DE USUÁRIO ===")
         
         username = input("Nome de usuário: ").strip()
-        password = getpass.getpass("Senha: ")
+        password = getpass("Senha: ")
         
         # Primeiro, busca o salt do usuário no servidor
         salt_request = {
@@ -484,13 +485,17 @@ class SecureClientComplete:
             'action': 'schedule_appointment',
             'token': self.session_token,
             'tutor_id': selected_tutor['id'],
-            'student_id': student_id,
+            #student_id': student_id,
             'platform_id': platform_id,
             'appointment_date': appointment_date,
             'duration': int(duration) if duration else 60,
             'notes': notes
         }
-        
+
+        # Só envia student_id se não for aluno
+        if self.user_type != 'aluno':
+            schedule_data['student_id'] = student_id   
+
         response = self._send_secure_message(schedule_data)
         
         if response and response.get('success'):
@@ -662,40 +667,52 @@ class SecureClientComplete:
             print(f"❌ Erro ao atualizar perfil: {error}")
     
     def delete_account(self):
-        """Exclui conta do usuário"""
+        """Exclui a conta do usuário"""
         if not self.session_token:
             print("❌ Faça login primeiro")
             return
-        
+
         print("\n=== EXCLUIR CONTA ===")
         print("⚠️  ATENÇÃO: Esta ação é irreversível!")
         print("⚠️  Todos os seus agendamentos serão cancelados!")
-        
-        confirm = input("Tem certeza que deseja excluir sua conta? (digite 'EXCLUIR'): ")
-        if confirm != 'EXCLUIR':
-            print("Exclusão cancelada")
+        confirm = input("Tem certeza que deseja excluir sua conta? (digite 'EXCLUIR'): ").strip()
+        if confirm != "EXCLUIR":
+            print("Operação cancelada.")
             return
-        
-        password = getpass.getpass("Digite sua senha para confirmar: ")
-        
-        # Hash da senha
-        password_data = self.security.hash_password_client_side(password)
-        
-        delete_data = {
+
+        # 1) obter username atual
+        prof = self._send_secure_message({'action': 'get_profile', 'token': self.session_token})
+        if not (prof and prof.get('success')):
+            print("❌ Não foi possível obter seu perfil.")
+            return
+        username = prof['profile']['username']
+
+        # 2) buscar salt do usuário (mesmo fluxo do login)
+        salt_resp = self._send_secure_message({'action': 'get_salt', 'username': username})
+        if not (salt_resp and salt_resp.get('success')):
+            print("❌ Não foi possível obter o salt do usuário.")
+            return
+        salt = salt_resp['salt']
+
+        # 3) pedir senha e gerar o mesmo client_hash do login/cadastro, porém com o salt correto
+        password = getpass("Digite sua senha para confirmar: ").strip()
+        client_side = self.security.hash_password_client_side(password, salt)
+        password_hash = client_side['client_hash']  # base64 a ser validado no servidor
+
+        # 4) enviar requisição de exclusão
+        req = {
             'action': 'delete_account',
             'token': self.session_token,
-            'password_hash': password_data['client_hash']
+            'password_hash': password_hash
         }
-        
-        response = self._send_secure_message(delete_data)
-        
-        if response and response.get('success'):
+        resp = self._send_secure_message(req)
+
+        if resp and resp.get('success'):
             print("✅ Conta excluída com sucesso!")
             self.session_token = None
-            self.user_type = None
         else:
-            error = response.get('error', 'Erro desconhecido') if response else 'Sem resposta do servidor'
-            print(f"❌ Erro ao excluir conta: {error}")
+            err = resp.get('error', 'Erro desconhecido') if resp else 'Sem resposta do servidor'
+            print(f"❌ Erro ao excluir conta: {err}")
     
     def logout(self):
         """Faz logout do usuário"""
@@ -705,14 +722,15 @@ class SecureClientComplete:
     
     def main_menu(self):
         """Menu principal do cliente"""
+       
         if not self.connect():
             return
-        
+    
         while True:
             print("\n" + "="*60)
             print("🎓 SISTEMA DE AGENDAMENTO - CLIENTE SEGURO COMPLETO")
             print("="*60)
-            
+        
             if not self.session_token:
                 # Menu não logado
                 print("1. Cadastrar usuário")
@@ -731,26 +749,33 @@ class SecureClientComplete:
                     break
                 else:
                     print("❌ Opção inválida!")
-            
+        
             else:
                 # Menu logado
                 print(f"Logado como: {self.user_type.upper()}")
                 print("="*60)
-                print("1. Ver meu perfil")
-                print("2. Atualizar perfil")
-                print("3. Listar tutores")
-                
+
+                # numeração dinâmica
+                menu_number = 1
+                print(f"{menu_number}. Ver meu perfil"); menu_number += 1
+                print(f"{menu_number}. Atualizar perfil"); menu_number += 1
+                print(f"{menu_number}. Listar tutores"); menu_number += 1
+
                 if self.user_type != 'aluno':
-                    print("4. Listar alunos")
-                
-                print("5. Listar plataformas")
-                print("6. Agendar aula")
-                print("7. Ver meus agendamentos")
-                print("8. Reagendar aula")
-                print("9. Cancelar aula")
-                print("10. Excluir conta")
-                print("11. Logout")
-                print("12. Sair")
+                    print(f"{menu_number}. Listar alunos")
+                    alunos_option = str(menu_number)
+                    menu_number += 1
+                else:
+                    alunos_option = None
+
+                print(f"{menu_number}. Listar plataformas"); plataformas_option = str(menu_number); menu_number += 1
+                print(f"{menu_number}. Agendar aula"); agendar_option = str(menu_number); menu_number += 1
+                print(f"{menu_number}. Ver meus agendamentos"); meus_agendamentos_option = str(menu_number); menu_number += 1
+                print(f"{menu_number}. Reagendar aula"); reagendar_option = str(menu_number); menu_number += 1
+                print(f"{menu_number}. Cancelar aula"); cancelar_option = str(menu_number); menu_number += 1
+                print(f"{menu_number}. Excluir conta"); excluir_option = str(menu_number); menu_number += 1
+                print(f"{menu_number}. Logout"); logout_option = str(menu_number); menu_number += 1
+                print(f"{menu_number}. Sair"); sair_option = str(menu_number); menu_number += 1
                 print("="*60)
                 
                 choice = input("Escolha uma opção: ").strip()
@@ -761,28 +786,30 @@ class SecureClientComplete:
                     self.update_profile()
                 elif choice == '3':
                     self.list_tutors()
-                elif choice == '4' and self.user_type != 'aluno':
+                elif alunos_option and choice == alunos_option:
                     self.list_students()
-                elif choice == '5':
+                elif choice == plataformas_option:
                     self.list_platforms()
-                elif choice == '6':
+                elif choice == agendar_option:
                     self.schedule_appointment()
-                elif choice == '7':
+                elif choice == meus_agendamentos_option:
                     self.list_appointments()
-                elif choice == '8':
+                elif choice == reagendar_option:
+                    print("\n⚠️  Use o número do campo 'ID' mostrado na lista, não o índice da ordem.")
                     self.update_appointment()
-                elif choice == '9':
+                elif choice == cancelar_option:
+                    print("\n⚠️  Use o número do campo 'ID' mostrado na lista, não o índice da ordem.")
                     self.cancel_appointment()
-                elif choice == '10':
+                elif choice == excluir_option:
                     self.delete_account()
-                elif choice == '11':
+                elif choice == logout_option:
                     self.logout()
-                elif choice == '12':
+                elif choice == sair_option:
                     print("👋 Encerrando cliente...")
                     break
                 else:
                     print("❌ Opção inválida!")
-        
+    
         if self.socket:
             self.socket.close()
 
