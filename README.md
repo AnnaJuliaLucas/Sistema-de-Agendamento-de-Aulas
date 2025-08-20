@@ -4,7 +4,18 @@
   </a>
 </p>
 
-<h1 align="center">Sistema de Agendamento de Aulas</h1>
+<div align="center">
+  
+  <h1 align="center">Sistema de Agendamento de Aulas</h1>
+  
+  <!-- Vídeo demonstração -->
+  <a href="https://youtu.be/8Q2AN6Bb1D8" target="_blank">
+    <img alt="Vídeo YouTube" src="https://img.shields.io/badge/YouTube-Demonstra%C3%A7%C3%A3o-FF0000?logo=youtube&logoColor=white">
+  </a>
+  
+</div>
+
+
 
 
 O **Sistema de Agendamento de Aulas** é um projeto acadêmico desenvolvido para a disciplina **Redes de Computadores - DCC042** da UFJF.  Ele simula uma plataforma de agendamento de aulas entre **alunos** e **tutores**, aplicando conceitos de:
